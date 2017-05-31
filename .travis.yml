@@ -1,0 +1,16 @@
+language: julia
+julia:
+  - 0.6
+os:
+  - linux
+notifications:
+  email: mkolar@gmail.com
+addons:
+    apt_packages:
+        - gfortran
+sudo: false
+script:
+  - julia -e 'Pkg.clone("https://github.com/mlakolar/ProximalBase.jl"); Pkg.clone("https://github.com/mlakolar/HD.jl"); Pkg.clone(pwd()); Pkg.build("ROCKET"); Pkg.test("ROCKET"; coverage=true)'
+after_success:
+    - echo $TRAVIS_JULIA_VERSION
+    - julia -e 'Pkg.add("Coverage"); cd(Pkg.dir("ROCKET")); using Coverage; Codecov.submit(process_folder())'
