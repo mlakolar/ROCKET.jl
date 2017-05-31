@@ -1,3 +1,66 @@
+function _teInferenceGaussian{T<:AbstractFloat}(
+  Y::Matrix{T}, a::Int, b::Int,
+  methodType=1,
+  options)
+
+  n, p = size(Y)
+  I = setdiff(1:p, [a,b])
+
+  scaleX = zeros(p-2)
+
+  for j=1:p-2
+    indJ = I[j]
+    for i=1:n
+      scaleX[j] += Y[i, indJ]^2.
+    end
+    scaleX[j] = sqrt(scaleX[j] / n)
+  end
+
+  if methodType == 1
+    # lasso
+    λ = options.λ
+
+
+  end
+
+  if methodType == 1 || methodType == 2 || methodType == 3
+      XX = covM(I, I);
+      Xya = covM(I, a);
+      Xyb = covM(I, b);
+
+      if isscalar(lambda)
+          lambda_a = lambda;
+          lambda_b = lambda;
+      else
+          lambda_a = lambda(1);
+          lambda_b = lambda(2);
+      end
+
+      if methodType == 1
+          gamma_a = copulaLasso(XX, Xya, lambda_a, lambdaWeigth(:,1), 'Verbose', 0);
+          gamma_b = copulaLasso(XX, Xyb, lambda_b, lambdaWeigth(:,2), 'Verbose', 0);
+      else
+          gamma_a = copulaDantzig(XX, Xya, lambda_a, mu);
+          gamma_b = copulaDantzig(XX, Xyb, lambda_b, mu);
+      end
+
+      S_a = abs(gamma_a) > zeroThreshold ;
+      S_b = abs(gamma_b) > zeroThreshold ;
+      ISa = I(S_a); ISb = I(S_b);
+      S = union(ISa, ISb);
+
+      if refit
+          gamma_a = covM(S, S) \ covM(S, a);
+          gamma_b = covM(S, S) \ covM(S, b);
+      else
+          S = I;
+      end
+
+
+
+end
+
+
 """
 teInference - Inference for an edge in an elliptical coopula model.
 
@@ -51,44 +114,10 @@ function teInference{T<:AbstractFloat}(
   elseif covarianceType == 3
     covM = nonparanormalCorrelation(Y)
   elseif covarianceType == 4
-    covM = cov(Y)
+    return _teInferenceGaussian(Y, a, b, methodType, options)
   else
     throw(ArgumentError("unknown covarianceType"))
   end
 
-  I = setdiff(1:p, [a,b])
-
-  if methodType == 1 || methodType == 2 || methodType == 3
-      XX = covM(I, I);
-      Xya = covM(I, a);
-      Xyb = covM(I, b);
-
-      if isscalar(lambda)
-          lambda_a = lambda;
-          lambda_b = lambda;
-      else
-          lambda_a = lambda(1);
-          lambda_b = lambda(2);
-      end
-
-      if methodType == 1
-          gamma_a = copulaLasso(XX, Xya, lambda_a, lambdaWeigth(:,1), 'Verbose', 0);
-          gamma_b = copulaLasso(XX, Xyb, lambda_b, lambdaWeigth(:,2), 'Verbose', 0);
-      else
-          gamma_a = copulaDantzig(XX, Xya, lambda_a, mu);
-          gamma_b = copulaDantzig(XX, Xyb, lambda_b, mu);
-      end
-
-      S_a = abs(gamma_a) > zeroThreshold ;
-      S_b = abs(gamma_b) > zeroThreshold ;
-      ISa = I(S_a); ISb = I(S_b);
-      S = union(ISa, ISb);
-
-      if refit
-          gamma_a = covM(S, S) \ covM(S, a);
-          gamma_b = covM(S, S) \ covM(S, b);
-      else
-          S = I;
-      end
 
 end
