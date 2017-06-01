@@ -31,7 +31,9 @@ function _stdColumn!{T<:AbstractFloat}(out::Vector{T}, X::AbstractMatrix{T})
   out
 end
 
-
+# hOmega = inv(ɛ'ɛ/n)
+# eP = hOmega[1,2]
+# eVar = (hOmega[1,1]*hOmega[2,2] + hOmega[1,2]*hOmega[1,2]) / n
 function _TEinv22{T<:AbstractFloat}(ɛ::Matrix{T})
   n, p = size(ɛ)
   p == 2 || throw(ArgumentError())
@@ -45,13 +47,9 @@ function _TEinv22{T<:AbstractFloat}(ɛ::Matrix{T})
     b += ɛ[i, 1] * ɛ[i, 2]
   end
 
-  a = a / n
-  b = b / n
-  c = c / n
-
   dt = a*c - b*b
-  eP = -b / dt
-  eVar = (a * c + b * b) / dt / dt / n
+  eP = -b / dt * n
+  eVar = (a * c + b * b) / dt / dt * n
   eP, eVar
 end
 
@@ -74,35 +72,37 @@ function _teInferenceGaussian{T<:AbstractFloat}(
 
   n, p = size(Y)
   I = setdiff(1:p, [a,b])
+  x = view(Y, :, I)
+  y = view(Y, :, [a,b])
 
   ɛ = zeros(T, (n, 2))
-  A_mul_B!(view(ɛ, :, 1), view(Y, :, I), γa)
-  A_mul_B!(view(ɛ, :, 2), view(Y, :, I), γb)
-  ɛ[:, 1] .= Y[:, a] - ɛ[:, 1]
-  ɛ[:, 2] .= Y[:, b] - ɛ[:, 2]
-
-  hΩ = inv(ɛ'*ɛ / n)
-  eP = hΩ[1,2]
-  eVar = (hΩ[1,1]*hΩ[2,2]+hΩ[1,2]^2.) / n
-
-  eP, eVar
+  @inbounds for i=1:n
+    ɛ[i, 1] = HD._row_A_mul_b(x, γa, i)
+    ɛ[i, 2] = HD._row_A_mul_b(x, γb, i)
+  end
+  @. ɛ = y - ɛ
+  _TEinv22(ɛ)
 end
 
 
+
+# Method Type:
+#               1 (default)     uses lasso to estimate the neighborhood
+#                               of node a and node b
+#               2               uses sqrt-lasso to estimate the neighborhood
+#                               of node a and node b
+#               3               uses scalled-lasso to estimate the neighborhood
+#                               of node a and node b
+#               4               OLS without model selection
 function _teInferenceGaussian{T<:AbstractFloat}(
   Y::Matrix{T}, a::Int, b::Int,
-  methodType::Int=1,
+  methodType::Int,
   options::ROCKETOptions=ROCKETOptions())
 
   n, p = size(Y)
   I = setdiff(1:p, [a,b])
 
   λ = options.λ
-  # if methodType == 2
-  #   λ = sqrt(2. * log(p) / n)
-  # elseif methodType == 3
-  #   λ = sqrt(2. * log(p) )
-  # end
   τ0 = options.zeroThreshold
 
   if methodType in [1, 2, 3]
@@ -142,7 +142,6 @@ function _teInferenceGaussian{T<:AbstractFloat}(
     else
       return _teInferenceGaussian(Y, a, b, γa, γb)
     end
-
   elseif methodType == 4
     return _teInferenceGaussian(Y, a, b, I)
   else
@@ -185,29 +184,33 @@ Returns:
 """
 function teInference{T<:AbstractFloat}(
   Y::Matrix{T}, a::Int, b::Int,
-  methodType=1,
-  covarianceType=1,
+  methodType::Int=1,
+  covarianceType::Int=1,
   options::ROCKETOptions=ROCKETOptions())
 
   a == b && throw(ArgumentError("a should not be equal to b"))
   n, p = size(Y)
-  1 <= a <= p && throw(ArgumentError("1 <= a <= p"))
-  1 <= b <= p && throw(ArgumentError("1 <= b <= p"))
+  1 <= a <= p || throw(ArgumentError("1 <= a <= p"))
+  1 <= b <= p || throw(ArgumentError("1 <= b <= p"))
 
-
-  # compute covariance / correlation
-  if covarianceType == 1
-    covM = kendallsTau(Y)
-    throw(ArgumentError("unknown covarianceType"))
-  elseif covarianceType == 2
-    covM = cor(Y)
-    throw(ArgumentError("unknown covarianceType"))
-  elseif covarianceType == 3
-    covM = nonparanormalCorrelation(Y)
-    throw(ArgumentError("unknown covarianceType"))
-  elseif covarianceType == 4
-    return _teInferenceGaussian(Y, a, b, methodType, options)
-  else
+  if covarianceType != 4
     throw(ArgumentError("unknown covarianceType"))
   end
+  return _teInferenceGaussian(Y, a, b, methodType, options)
+
+  # # compute covariance / correlation
+  # if covarianceType == 1
+  #   covM = kendallsTau(Y)
+  #   throw(ArgumentError("unknown covarianceType"))
+  # elseif covarianceType == 2
+  #   covM = cor(Y)
+  #   throw(ArgumentError("unknown covarianceType"))
+  # elseif covarianceType == 3
+  #   covM = nonparanormalCorrelation(Y)
+  #   throw(ArgumentError("unknown covarianceType"))
+  # elseif covarianceType == 4
+  #   return _teInferenceGaussian(Y, a, b, methodType, options)
+  # else
+  #   throw(ArgumentError("unknown covarianceType"))
+  # end
 end
