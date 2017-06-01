@@ -11,7 +11,7 @@ function kendallsTau{T<:AbstractFloat}(Y::Matrix{T})
     end
     T = zero(T)
     for i=1:n, j=i+1:n
-      @inbounds T += sign((Y[i, a] - Y[j, a])*(Y[i, b] - Y[j, b])
+      @inbounds T += sign((Y[i, a] - Y[j, a])*(Y[i, b] - Y[j, b]))
     end
     T = 2. * T / ((n-1)*n)
     T = sin(π/2*T)
