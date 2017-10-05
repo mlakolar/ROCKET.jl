@@ -3,7 +3,7 @@ struct ROCKETOptions
   zeroThreshold::Float64
   refit::Bool
   optionsCD::CDOptions
-  optionsScaledLasso::ScaledLassoOptions
+  optionsScaledLasso::IterLassoOptions
 end
 
 ROCKETOptions(;
@@ -11,7 +11,7 @@ ROCKETOptions(;
   zeroThreshold::Float64=1e-4,
   refit::Bool=true,
   optionsCD::CDOptions=CDOptions(),
-  optionsScaledLasso::ScaledLassoOptions=ScaledLassoOptions()) =
+  optionsScaledLasso::IterLassoOptions=IterLassoOptions()) =
      ROCKETOptions(λ, zeroThreshold, refit, optionsCD, optionsScaledLasso)
 
 
@@ -113,9 +113,8 @@ function _teInferenceGaussian{T<:AbstractFloat}(
 
     scaleX = zeros(p-2)
     _stdColumn!(scaleX, x)
-    scale!(scaleX, λ)
 
-    g = AProxL1(scaleX)
+    g = AProxL1(λ, scaleX)
     γa = SparseIterate(p-2)
     γb = SparseIterate(p-2)
     if methodType == 1
@@ -129,8 +128,8 @@ function _teInferenceGaussian{T<:AbstractFloat}(
       coordinateDescent!(γa, fa, g, options.optionsCD)
       coordinateDescent!(γb, fb, g, options.optionsCD)
     else # if methodType == 3
-      scaledLasso!(γa, x, ya, scaleX, options.optionsScaledLasso)
-      scaledLasso!(γb, x, yb, scaleX, options.optionsScaledLasso)
+      scaledLasso!(γa, x, ya, λ, scaleX, options.optionsScaledLasso)
+      scaledLasso!(γb, x, yb, λ, scaleX, options.optionsScaledLasso)
     end
 
     if options.refit

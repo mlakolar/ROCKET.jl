@@ -1,7 +1,7 @@
 module ROCKET
 
 using Distributions
-using HD, ProximalBase
+using CoordinateDescent, ProximalBase
 
 export
   teInference
