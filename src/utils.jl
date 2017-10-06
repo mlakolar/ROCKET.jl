@@ -9,14 +9,14 @@ function kendallsTau{T<:AbstractFloat}(Y::Matrix{T})
       covM[a,b] = 1.
       continue
     end
-    T = zero(T)
+    t = zero(T)
     for i=1:n, j=i+1:n
-      @inbounds T += sign((Y[i, a] - Y[j, a])*(Y[i, b] - Y[j, b]))
+      @inbounds t += sign((Y[i, a] - Y[j, a])*(Y[i, b] - Y[j, b]))
     end
-    T = 2. * T / ((n-1)*n)
-    T = sin(π/2*T)
-    covM[a,b] = T
-    covM[b,a] = T
+    t = 2. * t / ((n-1)*n)
+    t = sin(π/2*T)
+    covM[a,b] = t
+    covM[b,a] = t
   end
   covM
 end
